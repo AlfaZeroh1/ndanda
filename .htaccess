@@ -1,0 +1,15 @@
+Options -Indexes
+DirectoryIndex index.php
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /ndanda/
+  RewriteRule ^t/([A-Za-z0-9\-]+)/?$ tribute.php?s=$1 [L,QSA]
+  RewriteRule ^p/([A-Za-z0-9\-]+)/?$ programme.php?s=$1 [L,QSA]
+  RewriteRule ^f/([A-Za-z0-9]+)/?$ tribute-form.php?t=$1 [L,QSA]
+  RewriteRule ^blog/([A-Za-z0-9\-]+)/?$ post.php?s=$1 [L,QSA]
+</IfModule>
+
+<FilesMatch "\.(sql|md|log|lock|ini)$">
+  Require all denied
+</FilesMatch>

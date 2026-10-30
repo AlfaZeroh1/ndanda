@@ -1,0 +1,6 @@
+<Files "_layout.php">
+  Require all denied
+</Files>
+<Files "_editor.php">
+  Require all denied
+</Files>

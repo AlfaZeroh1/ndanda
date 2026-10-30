@@ -1,0 +1,302 @@
+-- Ndanda Tributes – database schema (MySQL 5.7+/MariaDB 10.3+)
+SET NAMES utf8mb4;
+SET FOREIGN_KEY_CHECKS = 0;
+
+CREATE TABLE IF NOT EXISTS users (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(120) NOT NULL,
+  email VARCHAR(160) NOT NULL UNIQUE,
+  phone VARCHAR(20) NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  role ENUM('admin','planner') NOT NULL DEFAULT 'planner',
+  status ENUM('active','suspended') NOT NULL DEFAULT 'active',
+  reset_token VARCHAR(64) NULL,
+  reset_expires DATETIME NULL,
+  is_test TINYINT(1) NOT NULL DEFAULT 0,
+  last_login DATETIME NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS settings (
+  skey VARCHAR(80) PRIMARY KEY,
+  svalue TEXT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS services (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  code VARCHAR(40) NOT NULL UNIQUE,
+  name VARCHAR(120) NOT NULL,
+  description TEXT NULL,
+  icon VARCHAR(40) NOT NULL DEFAULT 'bi-check2-circle',
+  price DECIMAL(10,2) NOT NULL DEFAULT 0,
+  is_standard TINYINT(1) NOT NULL DEFAULT 0,
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
+  sort INT NOT NULL DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS funerals (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id INT UNSIGNED NOT NULL,
+  slug VARCHAR(160) NOT NULL UNIQUE,
+  form_token VARCHAR(40) NOT NULL UNIQUE,
+  deceased_name VARCHAR(160) NOT NULL,
+  nickname VARCHAR(120) NULL,
+  heading VARCHAR(160) NOT NULL DEFAULT 'Celebrating the life of',
+  birth_date DATE NULL,
+  death_date DATE NULL,
+  birth_place VARCHAR(160) NULL,
+  resting_place VARCHAR(160) NULL,
+  photo VARCHAR(255) NULL,
+  cover VARCHAR(255) NULL,
+  quote VARCHAR(255) NULL,
+  obituary TEXT NULL,
+  bio MEDIUMTEXT NULL,
+  family TEXT NULL,
+  livestream_url VARCHAR(255) NULL,
+  livestream_at DATETIME NULL,
+  contribution_details TEXT NULL,
+  accept_pledges TINYINT(1) NOT NULL DEFAULT 1,
+  moderate_tributes TINYINT(1) NOT NULL DEFAULT 1,
+  visibility ENUM('public','unlisted') NOT NULL DEFAULT 'public',
+  status ENUM('draft','pending_payment','active','suspended','archived') NOT NULL DEFAULT 'pending_payment',
+  brand_primary VARCHAR(7) NOT NULL DEFAULT '#1f2937',
+  brand_accent VARCHAR(7) NOT NULL DEFAULT '#b8913a',
+  brand_font VARCHAR(60) NOT NULL DEFAULT 'Playfair Display',
+  brand_logo VARCHAR(255) NULL,
+  brand_name VARCHAR(120) NULL,
+  brand_tagline VARCHAR(160) NULL,
+  candles INT UNSIGNED NOT NULL DEFAULT 0,
+  views INT UNSIGNED NOT NULL DEFAULT 0,
+  is_featured TINYINT(1) NOT NULL DEFAULT 0,
+  is_test TINYINT(1) NOT NULL DEFAULT 0,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
+  KEY idx_status (status, visibility),
+  CONSTRAINT fk_funeral_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS orders (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  reference VARCHAR(20) NOT NULL UNIQUE,
+  user_id INT UNSIGNED NULL,
+  funeral_id INT UNSIGNED NULL,
+  amount DECIMAL(10,2) NOT NULL DEFAULT 0,
+  status ENUM('pending','paid','failed','cancelled') NOT NULL DEFAULT 'pending',
+  payment_method VARCHAR(20) NOT NULL DEFAULT 'mpesa',
+  phone VARCHAR(20) NULL,
+  mpesa_receipt VARCHAR(30) NULL,
+  notes VARCHAR(255) NULL,
+  paid_at DATETIME NULL,
+  is_test TINYINT(1) NOT NULL DEFAULT 0,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_status (status),
+  CONSTRAINT fk_order_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+  CONSTRAINT fk_order_funeral FOREIGN KEY (funeral_id) REFERENCES funerals(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS order_items (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id INT UNSIGNED NOT NULL,
+  service_id INT UNSIGNED NULL,
+  name VARCHAR(120) NOT NULL,
+  price DECIMAL(10,2) NOT NULL DEFAULT 0,
+  CONSTRAINT fk_item_order FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS funeral_services (
+  funeral_id INT UNSIGNED NOT NULL,
+  service_id INT UNSIGNED NOT NULL,
+  order_id INT UNSIGNED NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (funeral_id, service_id),
+  CONSTRAINT fk_fs_funeral FOREIGN KEY (funeral_id) REFERENCES funerals(id) ON DELETE CASCADE,
+  CONSTRAINT fk_fs_service FOREIGN KEY (service_id) REFERENCES services(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS mpesa_transactions (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id INT UNSIGNED NULL,
+  type ENUM('stk','c2b','manual','simulated') NOT NULL DEFAULT 'stk',
+  merchant_request_id VARCHAR(80) NULL,
+  checkout_request_id VARCHAR(80) NULL UNIQUE,
+  phone VARCHAR(20) NULL,
+  amount DECIMAL(10,2) NOT NULL DEFAULT 0,
+  account_ref VARCHAR(40) NULL,
+  result_code INT NULL,
+  result_desc VARCHAR(255) NULL,
+  mpesa_receipt VARCHAR(30) NULL,
+  trans_time VARCHAR(20) NULL,
+  payer_name VARCHAR(120) NULL,
+  status ENUM('pending','success','failed','cancelled','timeout') NOT NULL DEFAULT 'pending',
+  raw_request TEXT NULL,
+  raw_callback TEXT NULL,
+  is_test TINYINT(1) NOT NULL DEFAULT 0,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
+  KEY idx_receipt (mpesa_receipt),
+  CONSTRAINT fk_tx_order FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS mpesa_logs (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  endpoint VARCHAR(60) NOT NULL,
+  payload MEDIUMTEXT NULL,
+  ip VARCHAR(45) NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS tributes (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  funeral_id INT UNSIGNED NOT NULL,
+  author_name VARCHAR(120) NOT NULL,
+  relationship VARCHAR(80) NULL,
+  location VARCHAR(120) NULL,
+  email VARCHAR(160) NULL,
+  message TEXT NOT NULL,
+  photo VARCHAR(255) NULL,
+  status ENUM('pending','approved','hidden') NOT NULL DEFAULT 'pending',
+  is_test TINYINT(1) NOT NULL DEFAULT 0,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_tribute_funeral FOREIGN KEY (funeral_id) REFERENCES funerals(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS gallery (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  funeral_id INT UNSIGNED NOT NULL,
+  file VARCHAR(255) NOT NULL,
+  caption VARCHAR(200) NULL,
+  sort INT NOT NULL DEFAULT 0,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_gallery_funeral FOREIGN KEY (funeral_id) REFERENCES funerals(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS programme_events (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  funeral_id INT UNSIGNED NOT NULL,
+  event_date DATE NOT NULL,
+  start_time TIME NOT NULL,
+  end_time TIME NULL,
+  title VARCHAR(160) NOT NULL,
+  description TEXT NULL,
+  venue VARCHAR(160) NULL,
+  address VARCHAR(255) NULL,
+  lat DECIMAL(10,7) NULL,
+  lng DECIMAL(10,7) NULL,
+  contact_name VARCHAR(120) NULL,
+  contact_phone VARCHAR(30) NULL,
+  sort INT NOT NULL DEFAULT 0,
+  CONSTRAINT fk_prog_funeral FOREIGN KEY (funeral_id) REFERENCES funerals(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS order_of_service (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  funeral_id INT UNSIGNED NOT NULL,
+  time_label VARCHAR(30) NULL,
+  item VARCHAR(200) NOT NULL,
+  person VARCHAR(160) NULL,
+  details TEXT NULL,
+  sort INT NOT NULL DEFAULT 0,
+  CONSTRAINT fk_oos_funeral FOREIGN KEY (funeral_id) REFERENCES funerals(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS prep_documents (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  funeral_id INT UNSIGNED NOT NULL,
+  title VARCHAR(160) NOT NULL,
+  category VARCHAR(60) NULL,
+  file VARCHAR(255) NOT NULL,
+  original_name VARCHAR(200) NULL,
+  size INT UNSIGNED NOT NULL DEFAULT 0,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_doc_funeral FOREIGN KEY (funeral_id) REFERENCES funerals(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS prep_notes (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  funeral_id INT UNSIGNED NOT NULL,
+  title VARCHAR(160) NOT NULL,
+  body TEXT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_note_funeral FOREIGN KEY (funeral_id) REFERENCES funerals(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS prep_tasks (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  funeral_id INT UNSIGNED NOT NULL,
+  title VARCHAR(200) NOT NULL,
+  assignee VARCHAR(120) NULL,
+  due_date DATE NULL,
+  is_done TINYINT(1) NOT NULL DEFAULT 0,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_task_funeral FOREIGN KEY (funeral_id) REFERENCES funerals(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS prep_budget (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  funeral_id INT UNSIGNED NOT NULL,
+  category VARCHAR(60) NOT NULL,
+  item VARCHAR(160) NOT NULL,
+  estimated DECIMAL(12,2) NOT NULL DEFAULT 0,
+  actual DECIMAL(12,2) NOT NULL DEFAULT 0,
+  is_paid TINYINT(1) NOT NULL DEFAULT 0,
+  notes VARCHAR(255) NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_budget_funeral FOREIGN KEY (funeral_id) REFERENCES funerals(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS contributions (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  funeral_id INT UNSIGNED NOT NULL,
+  name VARCHAR(120) NOT NULL,
+  phone VARCHAR(30) NULL,
+  amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+  status ENUM('pledged','received') NOT NULL DEFAULT 'pledged',
+  source ENUM('public','planner') NOT NULL DEFAULT 'planner',
+  note VARCHAR(255) NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_contrib_funeral FOREIGN KEY (funeral_id) REFERENCES funerals(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS pages (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  slug VARCHAR(80) NOT NULL UNIQUE,
+  title VARCHAR(160) NOT NULL,
+  subtitle VARCHAR(255) NULL,
+  content MEDIUMTEXT NULL,
+  meta_description VARCHAR(255) NULL,
+  is_system TINYINT(1) NOT NULL DEFAULT 0,
+  is_published TINYINT(1) NOT NULL DEFAULT 1,
+  show_in_footer TINYINT(1) NOT NULL DEFAULT 0,
+  updated_at DATETIME NULL ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS posts (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  slug VARCHAR(160) NOT NULL UNIQUE,
+  title VARCHAR(200) NOT NULL,
+  excerpt VARCHAR(300) NULL,
+  content MEDIUMTEXT NULL,
+  cover VARCHAR(255) NULL,
+  author VARCHAR(120) NULL,
+  status ENUM('draft','published') NOT NULL DEFAULT 'draft',
+  is_test TINYINT(1) NOT NULL DEFAULT 0,
+  published_at DATETIME NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS messages (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  type ENUM('contact','livestream','photography','support') NOT NULL DEFAULT 'contact',
+  name VARCHAR(120) NOT NULL,
+  email VARCHAR(160) NULL,
+  phone VARCHAR(30) NULL,
+  subject VARCHAR(200) NULL,
+  message TEXT NOT NULL,
+  event_date DATE NULL,
+  is_read TINYINT(1) NOT NULL DEFAULT 0,
+  is_test TINYINT(1) NOT NULL DEFAULT 0,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+SET FOREIGN_KEY_CHECKS = 1;
