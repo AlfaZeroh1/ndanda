@@ -11,6 +11,16 @@ $lock = __DIR__ . '/database/install.lock';
 if (file_exists($lock)) {
     exit('Already installed. Delete database/install.lock to run the installer again.');
 }
+// Never let the installer run against a database that already has an admin,
+// even if the lock file is missing (e.g. after a fresh git deploy)
+try {
+    if (db()->query("SHOW TABLES LIKE 'users'")->fetchColumn() && val("SELECT COUNT(*) FROM users WHERE role = 'admin'")) {
+        file_put_contents($lock, date('c'));
+        exit('Already installed (an admin account exists). Use database/reset-admin.php from the server terminal to recover access.');
+    }
+} catch (Throwable $e) {
+    // database not reachable yet – the form below will report it
+}
 
 function run_sql_file(PDO $pdo, string $file, array $replace = []): void
 {

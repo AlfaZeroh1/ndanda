@@ -263,8 +263,13 @@ function require_login(): array
 function require_admin(): array
 {
     $u = current_user();
-    if (!$u || $u['role'] !== 'admin') {
-        redirect(url('login.php?next=' . urlencode($_SERVER['REQUEST_URI'] ?? '')));
+    if (!$u) {
+        redirect(url('login.php?admin=1&next=' . urlencode($_SERVER['REQUEST_URI'] ?? '')));
+    }
+    if ($u['role'] !== 'admin') {
+        // Logged in as a planner: sending them back to login would loop forever
+        flash('warning', 'That area is for administrators only. You are logged in as ' . $u['email'] . '.');
+        redirect(url('account/'));
     }
     return $u;
 }

@@ -1,0 +1,10 @@
+# Server-specific secrets – copy config.example.php to config.php on each server
+config.php
+database/install.lock
+# User uploads (keep the protection files)
+uploads/*
+!uploads/.htaccess
+!uploads/private/
+uploads/private/*
+!uploads/private/.htaccess
+.DS_Store

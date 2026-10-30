@@ -8,11 +8,11 @@
 // Database
 define('DB_HOST', 'localhost');
 define('DB_NAME', 'ndanda');
-define('DB_USER', 'nario');
-define('DB_PASS', 'nariokotome');
+define('DB_USER', 'root');
+define('DB_PASS', '');
 
 // Full public URL of the app, no trailing slash. e.g. https://tributes.ndandaevents.com
-define('BASE_URL', 'https://bisoftlive.duckdns.org/ndanda');
+define('BASE_URL', 'http://localhost/ndanda-tributes');
 
 // Set to false on the live server
 define('APP_DEBUG', true);
